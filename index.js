@@ -1,14 +1,14 @@
+require('dotenv').config();
+
 const express = require('express');
 const path = require('path');
 
-// ⚠️ Clé de l'API tierce bancheckapi.tsunstudio.me — modifie directement ici
-const BAN_KEY = 'saeed';
+const PORT = parseInt(process.env.PORT || '5000', 10);
+const BAN_KEY = process.env.BAN_KEY || 'saeed';
+const LOG_RAW_RESPONSES = process.env.LOG_RAW_RESPONSES === '1';
 
-// Port d'écoute
-const PORT = 5000;
-
-// Passe à true pour logger les réponses brutes des API (debug uniquement)
-const LOG_RAW_RESPONSES = false;
+const NAMECHECK_URL = (uid) => `https://infoxvisits.tsunxkittens.app/info/${uid}`;
+const BANCHECK_URL = (uid, key) => `https://bancheckapi.tsunstudio.me/bancheck?key=${encodeURIComponent(key)}&uid=${uid}`;
 
 const app = express();
 
@@ -38,9 +38,11 @@ app.get('/docs', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- Fetch avec timeout + retries (équivalent de la session requests + Retry) ---
-async function fetchWithRetry(url, { timeoutMs = 15000, maxAttempts = 3, backoffFactor = 500, label = '' } = {}) {
+// --- Fetch avec timeout + retries (équivalent de la session requests + Retry côté Python) ---
+async function fetchWithRetry(url, { timeoutMs = 15000, maxAttempts = 3, backoffMs = 1000, label = '' } = {}) {
+  const RETRYABLE_STATUS = new Set([500, 502, 503, 504]);
   let lastErr;
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -55,15 +57,27 @@ async function fetchWithRetry(url, { timeoutMs = 15000, maxAttempts = 3, backoff
       });
       clearTimeout(timer);
 
+      const text = await res.text();
+      if (LOG_RAW_RESPONSES) log(`${label} | response | ${text.slice(0, 200)}...`);
+
       if (!res.ok) {
         const err = new Error(`HTTP ${res.status}`);
         err.httpStatus = res.status;
+        if (RETRYABLE_STATUS.has(res.status) && attempt < maxAttempts) {
+          log(`${label} | retryable http error | attempt=${attempt} | status=${res.status}`);
+          await new Promise((r) => setTimeout(r, backoffMs * attempt));
+          continue;
+        }
         throw err;
       }
 
-      const text = await res.text();
-      if (LOG_RAW_RESPONSES) log(`${label} | response | ${text.slice(0, 200)}...`);
-      return JSON.parse(text);
+      try {
+        return JSON.parse(text);
+      } catch {
+        const err = new Error('Invalid JSON response');
+        err.isParseError = true;
+        throw err;
+      }
     } catch (err) {
       clearTimeout(timer);
       lastErr = err;
@@ -72,9 +86,10 @@ async function fetchWithRetry(url, { timeoutMs = 15000, maxAttempts = 3, backoff
         err.isTimeout = true;
         throw err;
       }
-      if (attempt < maxAttempts && !err.httpStatus) {
+      if (!err.httpStatus && !err.isParseError && attempt < maxAttempts) {
+        // Erreur réseau (DNS, connexion refusée, etc.) -> on retente avec backoff
         log(`${label} | connection error | attempt=${attempt} | ${err.message}`);
-        await new Promise((r) => setTimeout(r, backoffFactor * attempt));
+        await new Promise((r) => setTimeout(r, backoffMs * attempt));
         continue;
       }
       throw err;
@@ -83,62 +98,72 @@ async function fetchWithRetry(url, { timeoutMs = 15000, maxAttempts = 3, backoff
   throw lastErr;
 }
 
-// --- Calcul du "Last_Login" lisible (équivalent du bloc datetime Python) ---
-function computeLastLogin(rawLastLogin) {
-  if (!rawLastLogin) return { formattedDate: null, lastLoginText: null };
-
-  let lastLoginDate = null;
-
-  // Essai timestamp (secondes)
-  if (/^\d+$/.test(String(rawLastLogin))) {
-    lastLoginDate = new Date(parseInt(rawLastLogin, 10) * 1000);
-  } else {
-    // Format "YYYY-MM-DD HH:MM:SS TZ" -> on retire le suffixe timezone
-    const parts = String(rawLastLogin).trim().split(' ');
-    if (parts.length >= 2) {
-      const dateStr = `${parts[0]}T${parts[1]}`;
-      const parsed = new Date(dateStr);
-      if (!isNaN(parsed.getTime())) lastLoginDate = parsed;
-    }
-  }
-
-  if (!lastLoginDate || isNaN(lastLoginDate.getTime())) {
-    return { formattedDate: null, lastLoginText: null };
-  }
-
-  const formattedDate = lastLoginDate.toISOString().slice(0, 10);
-  const now = new Date();
-  const diffMs = now - lastLoginDate;
-  const totalSeconds = diffMs / 1000;
-  const days = Math.floor(totalSeconds / 86400);
-
-  let text;
-  if (totalSeconds < 0 || totalSeconds < 60) {
-    text = 'Just now';
-  } else if (totalSeconds < 3600) {
-    const minutes = Math.floor(totalSeconds / 60);
-    text = `${minutes} Minute${minutes !== 1 ? 's' : ''} Ago`;
-  } else if (totalSeconds < 86400) {
-    const hours = Math.floor(totalSeconds / 3600);
-    text = `${hours} Hour${hours !== 1 ? 's' : ''} Ago`;
-  } else if (days < 30) {
-    text = `${days} Day${days !== 1 ? 's' : ''} Ago`;
-  } else if (days < 365) {
-    const months = Math.floor(days / 30);
-    const remDays = days % 30;
-    text = `${months} Month${months !== 1 ? 's' : ''} And ${remDays} Day${remDays !== 1 ? 's' : ''} Ago`;
-  } else {
-    const years = Math.floor(days / 365);
-    const remDays1 = days % 365;
-    const months = Math.floor(remDays1 / 30);
-    const remDays = remDays1 % 30;
-    text = `${years} Year${years !== 1 ? 's' : ''} ${months} Month${months !== 1 ? 's' : ''} And ${remDays} Day${remDays !== 1 ? 's' : ''} Ago`;
-  }
-
-  return { formattedDate, lastLoginText: text };
+function describeError(label, err) {
+  if (err.isTimeout) return `${label} API request timed out`;
+  if (err.isParseError) return `Failed to parse ${label} API response`;
+  if (err.httpStatus) return `${label} API returned error: ${err.httpStatus}`;
+  return `Failed to connect to ${label} API. Please check the URL or try again later.`;
 }
 
-// --- Combine namecheck + bancheck ---
+function appendError(combined, message) {
+  combined.error = combined.error ? `${combined.error} | ${message}` : message;
+}
+
+// --- Calcule le texte "il y a X jours/mois/ans" à partir d'une date ---
+function formatLastLogin(date) {
+  const diffMs = Date.now() - date.getTime();
+  const totalSeconds = diffMs / 1000;
+
+  if (totalSeconds < 0 || totalSeconds < 60) return 'Just now';
+  if (totalSeconds < 3600) {
+    const minutes = Math.floor(totalSeconds / 60);
+    return `${minutes} Minute${minutes !== 1 ? 's' : ''} Ago`;
+  }
+  if (totalSeconds < 86400) {
+    const hours = Math.floor(totalSeconds / 3600);
+    return `${hours} Hour${hours !== 1 ? 's' : ''} Ago`;
+  }
+
+  const days = Math.floor(totalSeconds / 86400);
+  if (days < 30) return `${days} Day${days !== 1 ? 's' : ''} Ago`;
+
+  if (days < 365) {
+    const months = Math.floor(days / 30);
+    const remDays = days % 30;
+    return `${months} Month${months !== 1 ? 's' : ''} And ${remDays} Day${remDays !== 1 ? 's' : ''} Ago`;
+  }
+
+  const years = Math.floor(days / 365);
+  const remaining = days % 365;
+  const months = Math.floor(remaining / 30);
+  const remDays = remaining % 30;
+  return `${years} Year${years !== 1 ? 's' : ''} ${months} Month${months !== 1 ? 's' : ''} And ${remDays} Day${remDays !== 1 ? 's' : ''} Ago`;
+}
+
+// --- Parse AccountLastLogin, qu'il s'agisse d'un timestamp ou d'une date "YYYY-MM-DD HH:MM:SS TZ" ---
+function parseLastLoginDate(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+
+  // Cas 1: timestamp Unix (secondes)
+  if (/^\d+$/.test(String(raw).trim())) {
+    const ts = parseInt(raw, 10);
+    const d = new Date(ts * 1000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // Cas 2: chaîne "YYYY-MM-DD HH:MM:SS TZ" -> on retire le fuseau final et on parse le reste
+  const str = String(raw).trim();
+  const withoutTz = str.replace(/\s+\S+$/, '');
+  const isoLike = withoutTz.replace(' ', 'T');
+  const d = new Date(isoLike);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function toDateOnly(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+// --- Interroge les APIs namecheck + bancheck et combine le résultat ---
 async function getCombinedData(uid, banKey) {
   const combined = {
     nickname: null,
@@ -152,47 +177,34 @@ async function getCombinedData(uid, banKey) {
     error: null,
   };
 
-  const namecheckUrl = `https://infoxvisits.tsunxkittens.app/info/${uid}`;
-  const bancheckUrl = `https://bancheckapi.tsunstudio.me/bancheck?key=${banKey}&uid=${uid}`;
-
-  // Namecheck
+  // --- Namecheck ---
   try {
-    const data = await fetchWithRetry(namecheckUrl, { label: 'NAMECHECK' });
+    const data = await fetchWithRetry(NAMECHECK_URL(uid), { label: 'NAMECHECK' });
     combined.nickname = data?.AccountInfo?.AccountName ?? null;
     combined.uid = data?.SocialInfo?.accountId ?? uid;
     combined.AccountLevel = data?.AccountInfo?.AccountLevel ?? null;
     combined.region = data?.AccountInfo?.AccountRegion ?? null;
     combined.AccountLastLogin = data?.AccountInfo?.AccountLastLogin ?? null;
   } catch (err) {
-    if (err.isTimeout) {
-      combined.error = 'Namecheck API request timed out';
-    } else if (err.httpStatus) {
-      combined.error = `Namecheck API returned error: ${err.httpStatus}`;
-    } else {
-      combined.error = 'Failed to connect to namecheck API. Please check the URL or try again later.';
-    }
+    appendError(combined, describeError('Namecheck', err));
   }
 
-  // Bancheck
+  // --- Bancheck ---
   try {
-    const data = await fetchWithRetry(bancheckUrl, { label: 'BANCHECK' });
+    const data = await fetchWithRetry(BANCHECK_URL(uid, banKey), { label: 'BANCHECK' });
     combined.status = data?.status ?? null;
     combined.is_banned = data?.is_banned ?? null;
     combined.credits = data?.credits ?? null;
   } catch (err) {
-    let msg;
-    if (err.isTimeout) msg = 'Bancheck API request timed out';
-    else if (err.httpStatus) msg = `Bancheck API returned error: ${err.httpStatus}`;
-    else msg = 'Failed to connect to bancheck API';
-
-    combined.error = combined.error ? `${combined.error} | ${msg}` : msg;
+    appendError(combined, describeError('Bancheck', err));
   }
 
+  // --- Mise en forme de la dernière connexion ---
   if (combined.AccountLastLogin) {
-    const { formattedDate, lastLoginText } = computeLastLogin(combined.AccountLastLogin);
-    if (formattedDate) {
-      combined.AccountLastLogin = formattedDate;
-      combined.Last_Login = lastLoginText;
+    const lastLoginDate = parseLastLoginDate(combined.AccountLastLogin);
+    if (lastLoginDate) {
+      combined.AccountLastLogin = toDateOnly(lastLoginDate);
+      combined.Last_Login = formatLastLogin(lastLoginDate);
     }
   }
 

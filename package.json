@@ -1,6 +1,6 @@
 {
   "name": "verif-compte",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Vérification de statut de compte (UID) via API tierce",
   "main": "index.js",
   "engines": {
@@ -10,6 +10,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5"
   }
 }

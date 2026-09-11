@@ -298,6 +298,7 @@
       ['Niveau', data.AccountLevel ?? '—'],
       ['Région', data.region || '—'],
       ['Dernière connexion', data.Last_Login || data.AccountLastLogin || '—'],
+      ...(data.ban_period_months ? [['Durée du ban', `${data.ban_period_months} mois`]] : []),
     ].map(([label, value]) => `
       <div class="row">
         <span class="label">${escapeHtml(label)}</span>
