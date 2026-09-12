@@ -405,16 +405,12 @@
 
             <button class="check-btn" id="verifyBtn"><span id="verifyBtnLabel">VÉRIFIER</span></button>
 
-            <p class="card-foot"><span id="footFirst">⊥</span> <span class="mark" id="footerText">© BanChecker</span> <span id="footLast">⊥</span></p>
+            <p class="card-foot"></p>
         </section>
 
         <div class="persona">
-            <div class="persona-stats">
-                TITRE&nbsp;: TAKAMURA<br />
-                STATUT&nbsp;: <span id="personaStatus">INCONNU</span><br />
-                NIVEAU DE DANGER&nbsp;: <span class="danger">SSS</span>
-            </div>
-            <p class="persona-quote">« Je n'ai besoin d'aucune raison.<br />Seulement d'un résultat. »</p>
+            <div class="persona-stats"></div>
+            <p class="persona-quote"></p>
         </div>
 
         <p class="signature">✳ créé par <span>Takamura</span> ✳</p>
@@ -652,7 +648,7 @@
             document.getElementById('verifyBtnLabel').textContent = settings.checkBtn;
             document.getElementById('phone').placeholder = settings.placeholder;
             document.getElementById('autofillBtn').textContent = '⌘ ' + settings.autofillLabel;
-            document.getElementById('footerText').textContent = settings.footer;
+            settings.footer; // (footer visuel désactivé — champ conservé pour compatibilité)
             document.getElementById('codeBtn').textContent = '+' + settings.defaultCode;
 
             document.documentElement.style.setProperty('--green', settings.colorOk);
@@ -866,7 +862,7 @@
         function renderHistory() {
             const list = loadHistory();
             const el = document.getElementById('histList');
-            if (!list.length) { el.innerHTML = '<p class="hist-empty">Aucune vérification pour l\\'instant.</p>'; return; }
+            if (!list.length) { el.innerHTML = '<p class="hist-empty">Aucune vérification pour l’instant.</p>'; return; }
             el.innerHTML = list.map((item, i) => `
                 <div class="hist-item" data-idx="${i}">
                     <div>
@@ -928,12 +924,6 @@
             `;
 
             wrap.classList.add('open');
-
-            const personaEl = document.getElementById('personaStatus');
-            personaEl.classList.remove('st-ok', 'st-banned', 'st-modblock');
-            if (status === 'banned') { personaEl.textContent = 'BANNI'; personaEl.classList.add('st-banned'); }
-            else if (status === 'modblock') { personaEl.textContent = 'BLOQUÉ'; personaEl.classList.add('st-modblock'); }
-            else { personaEl.textContent = 'SÛR'; personaEl.classList.add('st-ok'); }
         }
 
         document.getElementById('resultCopyBtn').addEventListener('click', () => {
