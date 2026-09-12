@@ -61,11 +61,29 @@ app.post('/api/checkban', async (req, res) => {
             });
         }
 
-        // Réponse attendue : { status: 'ok', banned: boolean, reason?: string }
+        // La réponse Baron0 peut inclure des champs détaillés en plus
+        // du simple booléen "banned" (selon le plan de l'API) :
+        // ban_type, violation, category, appeal, eu, banned_at, appeal_filed.
+        // On les transmet tous au frontend, avec repli sur null si absents,
+        // pour que l'interface puisse toujours afficher le tableau de détails.
+        const banType = data.ban_type || data.banType || null;
+        const isModBlock =
+            data.mod_block === true ||
+            data.modBlock === true ||
+            (typeof banType === 'string' && /mod/i.test(banType));
+
         return res.json({
-            phone: digitsOnly,
+            phone: number,
             banned: data.banned === true,
-            message: data.reason || null
+            modBlock: isModBlock,
+            message: data.reason || data.message || null,
+            banType: banType,
+            violation: data.violation || null,
+            category: data.category || null,
+            appeal: data.appeal || null,
+            eu: typeof data.eu === 'boolean' ? data.eu : null,
+            bannedAt: data.banned_at || data.bannedAt || null,
+            appealFiled: data.appeal_filed || data.appealFiled || null
         });
     } catch (err) {
         console.error('Erreur checkban :', err.message);
