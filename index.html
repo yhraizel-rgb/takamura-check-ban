@@ -233,8 +233,7 @@
         .hist-empty { color: var(--text-dim); font-size: 12.5px; }
 
         /* ── Menu ── */
-        .menu-backdrop { position: fixed; inset: 0; z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
-        .menu-backdrop.open { opacity: 1; pointer-events: auto; }
+        .menu-backdrop { display: none; }
         .menu {
             position: absolute; top: 46px; right: 0; z-index: 22; width: 224px;
             background: #17102b; border: 1px solid var(--panel-border); border-radius: 14px; padding: 6px;
@@ -747,9 +746,9 @@
         document.getElementById('menuBtn').addEventListener('click', (e) => {
             e.stopPropagation();
             menu.classList.toggle('open');
-            menuBackdrop.classList.toggle('open', menu.classList.contains('open'));
         });
-        menuBackdrop.addEventListener('click', () => { menu.classList.remove('open'); menuBackdrop.classList.remove('open'); });
+        menu.addEventListener('click', (e) => e.stopPropagation());
+        document.addEventListener('click', () => closeMenu());
         function closeMenu() { menu.classList.remove('open'); menuBackdrop.classList.remove('open'); }
 
         // ── Modals open/close ──
