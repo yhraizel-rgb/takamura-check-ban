@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050505" />
-    <title>Le Silence Parle · BanCheck</title>
+    <title>LE SILENCE PARLE · BanCheck</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet" />
     <style>
@@ -93,16 +93,33 @@
             font-size: 15px; font-weight: 600; cursor: pointer; transition: border-color 0.2s ease;
         }
         .code-btn:hover { border-color: var(--accent); }
-        .code-input { width: 100%; box-sizing: border-box; background: transparent; color: var(--text); font: inherit; text-align: center; outline: none; cursor: text; }
-        .code-input:focus { border-color: var(--accent); box-shadow: 0 0 18px rgba(140,107,255,0.12); }
-
-        .fixed-code .code-btn {
-            cursor: default;
-            user-select: none;
-            pointer-events: none;
+        .code-input {
+            width: 100%;
+            box-sizing: border-box;
+            outline: none;
+            cursor: text;
             text-align: center;
         }
-        .fixed-code .code-btn:hover { border-color: var(--field-border); }
+        .code-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(140,107,255,0.16);
+        }
+
+        .code-list {
+            position: absolute; top: calc(100% + 6px); left: 0; z-index: 10;
+            background: #14101f; border: 1px solid var(--panel-border); border-radius: 12px;
+            min-width: 170px; max-height: 220px; overflow-y: auto;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+            opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .code-list.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .code-list button {
+            display: flex; justify-content: space-between; width: 100%; padding: 10px 14px;
+            background: none; border: none; color: #ded6f5; font-family: 'JetBrains Mono', monospace;
+            font-size: 13.5px; cursor: pointer; text-align: left;
+        }
+        .code-list button:hover { background: rgba(140,107,255,0.12); }
+        .code-list .cn { color: var(--text-dim); font-family: 'Oswald', sans-serif; font-size: 11px; }
 
         .phone-field { flex: 1; position: relative; }
         .phone-field input {
@@ -135,37 +152,21 @@
         .result-box.ok { background: rgba(52,211,153,0.08); border-color: rgba(52,211,153,0.4); color: var(--green); }
         .result-box.banned { background: rgba(255,45,61,0.08); border-color: rgba(255,45,61,0.4); color: var(--red); }
         .result-box.modblock { background: rgba(224,182,77,0.08); border-color: rgba(224,182,77,0.4); color: var(--amber); }
-        .result-box.banned { animation: menacePulse 1.25s ease-in-out infinite alternate; }
-        .result-box.ok { animation: retryPulse 1.15s ease-in-out infinite alternate; }
-        .result-box.modblock { animation: retryPulse 1.35s ease-in-out infinite alternate; }
-        .result-box.banned #resultText {
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            text-transform: uppercase;
-            animation: menaceText 0.75s ease-in-out infinite alternate;
+        .result-box.banned {
+            animation: dangerPulse 0.9s ease-in-out infinite alternate;
         }
-        .result-box.ok #resultText,
-        .result-box.modblock #resultText {
-            font-weight: 700;
-            animation: retryText 0.65s ease-in-out infinite alternate;
+        .result-box.ok {
+            animation: retryPulse 1s ease-in-out infinite alternate;
         }
-        @keyframes menacePulse {
+        @keyframes dangerPulse {
             from { transform: translateX(0) scale(1); box-shadow: 0 0 0 rgba(255,45,61,0); }
-            to { transform: translateX(-1px) scale(1.012); box-shadow: 0 0 24px rgba(255,45,61,0.18); }
-        }
-        @keyframes menaceText {
-            from { opacity: .78; text-shadow: 0 0 0 rgba(255,45,61,0); }
-            to { opacity: 1; text-shadow: 0 0 14px rgba(255,45,61,0.5); }
+            to { transform: translateX(-1px) scale(1.012); box-shadow: 0 0 26px rgba(255,45,61,.22); }
         }
         @keyframes retryPulse {
             from { transform: translateX(0) scale(1); box-shadow: 0 0 0 rgba(52,211,153,0); }
-            to { transform: translateX(1px) scale(1.012); box-shadow: 0 0 24px rgba(52,211,153,0.16); }
+            to { transform: translateX(1px) scale(1.012); box-shadow: 0 0 24px rgba(52,211,153,.18); }
         }
-        @keyframes retryText {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-1px); }
-            75% { transform: translateX(1px); }
-        }
+
         .result-copy {
             flex-shrink: 0; background: none; border: none; color: inherit; opacity: 0.75; cursor: pointer;
             padding: 2px; margin-top: 1px;
@@ -397,9 +398,10 @@
             <p class="panel-title" id="interfaceTitle"><span class="diamond">◈</span><span id="interfaceTitleText">LE SILENCE PARLE</span><span class="diamond">◈</span></p>
 
             <div class="row-split" id="inputRow">
-                <div class="code-select fixed-code">
-                    <input class="code-btn code-input" id="codeBtn" type="text" inputmode="numeric"
-                           autocomplete="tel-country-code" value="+237" aria-label="Indicatif pays">
+                <div class="code-select">
+                    <input class="code-btn code-input" id="codeBtn" type="text"
+                           inputmode="numeric" autocomplete="tel-country-code"
+                           value="" placeholder="+237" aria-label="Indicatif pays">
                 </div>
                 <div class="phone-field">
                     <input id="phone" type="tel" inputmode="numeric" placeholder="1234567890" />
@@ -429,7 +431,7 @@
             <p class="persona-quote"></p>
         </div>
 
-        <p class="signature">𓆩 <span>LE SILENCE PARLE.</span> 𓆪</p>
+        <p class="signature">𓆩 <span>𝐋𝐄 𝐒𝐈𝐋𝐄𝐍𝐂𝐄 𝐏𝐀𝐑𝐋𝐄.</span> 𓆪<br><span>𓆩 𝐋’𝐀𝐔𝐑𝐀 𝐃𝐄𝐌𝐄𝐔𝐑𝐄. 𓆪</span></p>
     </main>
 
     <!-- History drawer -->
@@ -451,7 +453,7 @@
             <div class="modal-head">
                 <div>
                     <h3>Settings</h3>
-                    <span class="sub">◈ · LE SILENCE PARLE · ◈</span>
+                    <span class="sub">◈ · BanChecker · ◈</span>
                 </div>
                 <button class="modal-close" id="settingsCloseBtn">✕</button>
             </div>
@@ -474,7 +476,6 @@
                             <div class="field"><label>Check button</label><input type="text" id="cfg_checkBtn"></div>
                             <div class="field"><label>Check button (loading)</label><input type="text" id="cfg_checkBtnLoading"></div>
                             <div class="field"><label>Number placeholder</label><input type="text" id="cfg_placeholder"></div>
-                            <div class="field"><label>Indicatif fixe</label><input type="text" id="cfg_defaultCode" value="237" readonly></div>
                             <div class="field"><label>Autofill label</label><input type="text" id="cfg_autofillLabel"></div>
                             <div class="field"><label>Footer</label><input type="text" id="cfg_footer"></div>
 
@@ -554,12 +555,12 @@
     <div class="modal-backdrop" id="creditsBackdrop">
         <div class="modal" style="max-height: 60vh;">
             <div class="modal-head">
-                <div><h3>Crédits</h3><span class="sub">◈ · LE SILENCE PARLE · ◈</span></div>
+                <div><h3>Crédits</h3><span class="sub">◈ · BanChecker · ◈</span></div>
                 <button class="modal-close" data-close="creditsBackdrop">✕</button>
             </div>
             <div class="modal-body">
-                <p>Interface & design — <strong style="color:#ded6f5">Le Silence Parle</strong></p>
-                <p>Vérification des numéros — service BanCheck</p>
+                <p>Interface & design — <strong style="color:#ded6f5">LE SILENCE PARLE</strong></p>
+                <p>Vérification des numéros — API BanCheck (Baron0)</p>
                 <p>Polices — Cinzel, Oswald, JetBrains Mono, Noto Sans JP</p>
             </div>
         </div>
@@ -569,7 +570,7 @@
     <div class="modal-backdrop" id="changelogBackdrop">
         <div class="modal" style="max-height: 70vh;">
             <div class="modal-head">
-                <div><h3>Journal des versions</h3><span class="sub">◈ · LE SILENCE PARLE · ◈</span></div>
+                <div><h3>Journal des versions</h3><span class="sub">◈ · BanChecker · ◈</span></div>
                 <button class="modal-close" data-close="changelogBackdrop">✕</button>
             </div>
             <div class="modal-body">
@@ -594,7 +595,7 @@
     <div class="modal-backdrop" id="apiBackdrop">
         <div class="modal" style="max-height: 60vh;">
             <div class="modal-head">
-                <div><h3>API BanCheck</h3><span class="sub">◈ · LE SILENCE PARLE · ◈</span></div>
+                <div><h3>API BanCheck</h3><span class="sub">◈ · BanChecker · ◈</span></div>
                 <button class="modal-close" data-close="apiBackdrop">✕</button>
             </div>
             <div class="modal-body">
@@ -621,7 +622,7 @@
             placeholder: '1234567890',
             defaultCode: '237',
             autofillLabel: 'Autofill',
-            footer: '𓆩 L’AURA DEMEURE. 𓆪',
+            footer: '𓆩 LE SILENCE PARLE. 𓆪',
             statusOk: 'This number is not banned',
             statusBanned: 'This number is banned',
             statusModBlock: 'This number is not banned (WhatsApp Mod block)',
@@ -665,7 +666,7 @@
             document.getElementById('phone').placeholder = settings.placeholder;
             document.getElementById('autofillBtn').textContent = '⌘ ' + settings.autofillLabel;
             settings.footer; // (footer visuel désactivé — champ conservé pour compatibilité)
-            document.getElementById('codeBtn').value = '+237';
+            document.getElementById('codeBtn').value = settings.defaultCode ? '+' + settings.defaultCode : '';
 
             document.documentElement.style.setProperty('--green', settings.colorOk);
             document.documentElement.style.setProperty('--red', settings.colorBanned);
@@ -684,7 +685,7 @@
             document.getElementById('cfg_checkBtn').value = settings.checkBtn;
             document.getElementById('cfg_checkBtnLoading').value = settings.checkBtnLoading;
             document.getElementById('cfg_placeholder').value = settings.placeholder;
-            document.getElementById('cfg_defaultCode').value = settings.defaultCode;
+            
             document.getElementById('cfg_autofillLabel').value = settings.autofillLabel;
             document.getElementById('cfg_footer').value = settings.footer;
             document.getElementById('cfg_statusOk').value = settings.statusOk;
@@ -714,7 +715,7 @@
                 checkBtn: val('cfg_checkBtn'),
                 checkBtnLoading: val('cfg_checkBtnLoading'),
                 placeholder: val('cfg_placeholder'),
-                defaultCode: val('cfg_defaultCode').replace('+', ''),
+                defaultCode: '237',
                 autofillLabel: val('cfg_autofillLabel'),
                 footer: val('cfg_footer'),
                 statusOk: val('cfg_statusOk'),
@@ -820,35 +821,85 @@
             showToast('Paramètres réinitialisés');
         });
 
-        // ── Background upload ──
-        document.getElementById('bgUploadBtn').addEventListener('click', () => document.getElementById('bgFileInput').click());
-        document.getElementById('bgFileInput').addEventListener('change', (e) => {
+        // ── Background upload — vrai envoi au serveur ──
+        document.getElementById('bgUploadBtn').addEventListener('click', () => {
+            document.getElementById('bgFileInput').click();
+        });
+
+        document.getElementById('bgFileInput').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-                settings.bgUrl = reader.result;
-                document.getElementById('cfg_bgUrl').value = '';
+
+            if (!file.type.startsWith('image/')) {
+                showToast('Fichier image invalide');
+                return;
+            }
+
+            // Limite raisonnable pour éviter les images énormes.
+            if (file.size > 10 * 1024 * 1024) {
+                showToast('Image trop lourde (10 Mo maximum)');
+                e.target.value = '';
+                return;
+            }
+
+            try {
+                showToast('Upload de l’image...');
+
+                const reader = new FileReader();
+                const dataUrl = await new Promise((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error('Lecture impossible'));
+                    reader.readAsDataURL(file);
+                });
+
+                const res = await fetch('/api/upload-background', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: dataUrl,
+                        filename: file.name,
+                        type: file.type
+                    })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || 'Upload impossible');
+                }
+
+                settings.bgUrl = data.url;
+                document.getElementById('cfg_bgUrl').value = data.url;
                 updateBgPreview();
-                document.getElementById('bgPreview').style.backgroundImage = `url('${reader.result}')`;
-                document.getElementById('bgPreview').textContent = '';
-            };
-            reader.readAsDataURL(file);
+
+                saveSettings(settings);
+                applySettings();
+
+                showToast('Image uploadée avec succès');
+            } catch (err) {
+                console.error(err);
+                showToast(err.message || 'Upload impossible');
+            } finally {
+                e.target.value = '';
+            }
         });
+
         document.getElementById('cfg_bgUrl').addEventListener('input', () => {
             settings.bgUrl = val('cfg_bgUrl');
             updateBgPreview();
         });
-        document.getElementById('bgResetBtn').addEventListener('click', () => {
+
+        document.getElementById('bgResetBtn').addEventListener('click', async () => {
             settings.bgUrl = '';
             document.getElementById('cfg_bgUrl').value = '';
             updateBgPreview();
+            saveSettings(settings);
+            applySettings();
         });
 
-        // ── Indicatif fixe Cameroun ──
+        // ── Indicatif pays saisissable à l'accueil ──
         const codeBtn = document.getElementById('codeBtn');
-        const FIXED_CODE = '237';
-        codeBtn.value = '+237';
+
 
         // ── Autofill (clipboard) ──
         document.getElementById('autofillBtn').addEventListener('click', async () => {
@@ -883,7 +934,7 @@
             el.querySelectorAll('.hist-item').forEach(row => {
                 row.addEventListener('click', () => {
                     const item = list[Number(row.getAttribute('data-idx'))];
-                    codeBtn.value = '+237';
+                    codeBtn.value = '';
                     document.getElementById('phone').value = item.rawNumber;
                     renderResult(item.status, item.data);
                     closeDrawer();
@@ -897,28 +948,23 @@
             saveHistory(list);
         }
 
-        // ── Result rendering ──
-        function statusColorClass(status) {
-            return status === 'banned' ? 'banned' : status === 'modblock' ? 'modblock' : 'ok';
-        }
-
         // ── Messages aléatoires ──
         const BANNED_MESSAGES = [
-            '𓆩 𝐋𝐄 𝐒𝐈𝐋𝐄𝐍𝐂𝐄 𝐏𝐀𝐑𝐋𝐄. 𓆪 — Ce numéro est OFF. Tu voulais une preuve ? La voilà.',
-            '𓆩 𝐋’𝐀𝐔𝐑𝐀 𝐃𝐄𝐌𝐄𝐔𝐑𝐄. 𓆪 — OFF. Le numéro n’a même pas eu le dernier mot.',
-            '⚔ 𝐓𝐄𝐍𝐓𝐀𝐓𝐈𝐕𝐄 𝐓𝐄𝐑𝐌𝐈𝐍𝐄́𝐄. — Ce numéro est OFF.',
-            '◈ 𝐎𝐅𝐅. 𝐒𝐈𝐋𝐄𝐍𝐂𝐄 𝐂𝐎𝐌𝐏𝐋𝐄𝐓. — La vérification ne ment pas.',
-            '𓆩 𝐑𝐈𝐄𝐍 𝐀̀ 𝐀𝐉𝐎𝐔𝐓𝐄𝐑. 𓆪 — Le numéro est tombé OFF.',
-            '⚡ 𝐋𝐀 𝐏𝐎𝐑𝐓𝐄 𝐒’𝐄𝐒𝐓 𝐅𝐄𝐑𝐌𝐄́𝐄. — Numéro OFF.'
+            '𓆩 𝐋𝐄 𝐒𝐈𝐋𝐄𝐍𝐂𝐄 𝐏𝐀𝐑𝐋𝐄. 𓆪 — OFF. Le résultat vient de tomber.',
+            '𓆩 𝐋’𝐀𝐔𝐑𝐀 𝐃𝐄𝐌𝐄𝐔𝐑𝐄. 𓆪 — OFF. Rien à discuter.',
+            '⚔ 𝐎𝐅𝐅. — La vérification a tranché.',
+            '◈ 𝐒𝐈𝐋𝐄𝐍𝐂𝐄 𝐂𝐎𝐌𝐏𝐋𝐄𝐓. — Ce numéro est OFF.',
+            '🔥 𝐋𝐄 𝐑𝐄́𝐒𝐔𝐋𝐓𝐀𝐓 𝐍𝐄 𝐌𝐄𝐍𝐓 𝐏𝐀𝐒. — OFF.',
+            '⚡ 𝐋𝐄 𝐂𝐎𝐔𝐏 𝐄𝐒𝐓 𝐏𝐀𝐒𝐒𝐄́. — Numéro OFF.'
         ];
 
         const RETRY_MESSAGES = [
-            '⚡ 𝐏𝐀𝐒 𝐄𝐍𝐂𝐎𝐑𝐄. — Le numéro tient toujours. Réessaie.',
-            '𓆩 𝐋𝐀 𝐏𝐑𝐎𝐂𝐇𝐀𝐈𝐍𝐄 𝐅𝐑𝐀𝐏𝐏𝐄 𝐏𝐄𝐔𝐓 𝐓𝐎𝐔𝐓 𝐂𝐇𝐀𝐍𝐆𝐄𝐑. 𓆪 — Réessaie.',
-            '⚔ 𝐈𝐋 𝐓𝐈𝐄𝐍𝐓 𝐄𝐍𝐂𝐎𝐑𝐄. — Ne lâche pas, vérifie à nouveau.',
-            '🔥 𝐋𝐄 𝐂𝐎𝐌𝐁𝐀𝐓 𝐍’𝐄𝐒𝐓 𝐏𝐀𝐒 𝐅𝐈𝐍𝐈. — Essaie encore.',
-            '◈ 𝐏𝐀𝐒 𝐃𝐄 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 𝐂𝐄𝐓𝐓𝐄 𝐅𝐎𝐈𝐒. — Recommence.',
-            '⚡ 𝐋𝐄 𝐒𝐈𝐋𝐄𝐍𝐂𝐄 𝐍’𝐀 𝐏𝐀𝐒 𝐄𝐍𝐂𝐎𝐑𝐄 𝐓𝐎𝐌𝐁𝐄́. — Réessaie.'
+            '⚡ 𝐏𝐀𝐒 𝐄𝐍𝐂𝐎𝐑𝐄. — Réessaie.',
+            '𓆩 𝐋𝐀 𝐏𝐑𝐎𝐂𝐇𝐀𝐈𝐍𝐄 𝐅𝐑𝐀𝐏𝐏𝐄 𝐏𝐄𝐔𝐓 𝐓𝐎𝐔𝐓 𝐂𝐇𝐀𝐍𝐆𝐄𝐑. 𓆪 — Essaie encore.',
+            '⚔ 𝐈𝐋 𝐓𝐈𝐄𝐍𝐓 𝐄𝐍𝐂𝐎𝐑𝐄. — Relance la vérification.',
+            '🔥 𝐋𝐄 𝐂𝐎𝐌𝐁𝐀𝐓 𝐍’𝐄𝐒𝐓 𝐏𝐀𝐒 𝐅𝐈𝐍𝐈. — Une nouvelle tentative.',
+            '◈ 𝐏𝐀𝐒 𝐂𝐄𝐓𝐓𝐄 𝐅𝐎𝐈𝐒. — Réessaie.',
+            '⚡ 𝐋𝐄 𝐒𝐈𝐋𝐄𝐍𝐂𝐄 𝐍’𝐀 𝐏𝐀𝐒 𝐓𝐎𝐌𝐁𝐄́. — Frappe encore.'
         ];
 
         function randomMessage(list) {
@@ -948,8 +994,10 @@
                 <div class="detail-row">
                     <span class="k">Phone</span>
                     <span class="v">${esc(d.phone)}</span>
-                </div>`;
+                </div>
+            `;
 
+            // Relance l'animation à chaque résultat.
             box.style.animation = 'none';
             void box.offsetWidth;
             box.style.animation = '';
@@ -967,7 +1015,8 @@
         const inputRow = document.getElementById('inputRow');
 
         verifyBtn.addEventListener('click', async () => {
-            const code = FIXED_CODE;
+            const code = (codeBtn.value || '').replace(/\D/g, '');
+            if (!code) { showToast('Saisis l’indicatif pays (ex: +237)'); codeBtn.focus(); return; }
             const rawNumber = phoneInput.value.trim();
             const digits = rawNumber.replace(/\D/g, '');
 
@@ -1002,7 +1051,14 @@
                 else if (data.modBlock === true || (data.banType && /mod/i.test(data.banType))) status = 'modblock';
 
                 const detail = {
-                    phone: data.phone || fullNumber
+                    phone: data.phone || fullNumber,
+                    banType: data.banType || null,
+                    violation: data.violation || null,
+                    category: data.category || null,
+                    appeal: data.appeal || null,
+                    eu: data.eu === true ? 'Oui' : data.eu === false ? 'Non' : null,
+                    bannedAt: data.bannedAt || null,
+                    appealFiled: data.appealFiled || null
                 };
 
                 renderResult(status, detail);
